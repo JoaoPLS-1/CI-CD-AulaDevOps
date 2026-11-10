@@ -1,0 +1,60 @@
+name: Validar e preparar entrega
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar-html:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validar HTML com HTMLHint
+        shell: bash
+        run: |
+          mapfile -d '' arquivos < <(find . -type d \( -name .git -o -name node_modules -o -name dist \) -prune -o -type f -name '*.html' -print0)
+          if [ "${#arquivos[@]}" -eq 0 ]; then
+            echo "Nenhum arquivo HTML encontrado para validar."
+          else
+            npx --yes htmlhint "${arquivos[@]}"
+          fi
+
+  validar-css:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar repositorio
+        uses: actions/checkout@v4
+
+      - name: Verificar arquivos CSS
+        shell: bash
+        run: |
+          mapfile -d '' arquivos < <(find . -type d \( -name .git -o -name node_modules -o -name dist \) -prune -o -type f -name '*.css' -print0)
+          if [ "${#arquivos[@]}" -eq 0 ]; then
+            echo "Nenhum arquivo CSS encontrado para verificar."
+          else
+            for arquivo in "${arquivos[@]}"; do
+              if [ ! -s "$arquivo" ]; then
+                echo "Erro: arquivo CSS vazio: $arquivo"
+                exit 1
+              fi
+              echo "Arquivo CSS nao vazio: $arquivo"
+            done
+          fi
+
+  preparar-entrega:
+    needs: [validar-html, validar-css]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Criar pasta dist
+        run: mkdir -p dist
