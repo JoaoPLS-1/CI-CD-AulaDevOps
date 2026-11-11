@@ -1,60 +1,53 @@
-name: Validar e preparar entrega
+name: Test, Build e Deploy
 
 on:
   push:
+    branches: [master]
   pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  validar-html:
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Baixar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configurar Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
       - name: Validar HTML com HTMLHint
-        shell: bash
+        run: npx --yes htmlhint index.html
+
+      - name: Verificar CSS
         run: |
-          mapfile -d '' arquivos < <(find . -type d \( -name .git -o -name node_modules -o -name dist \) -prune -o -type f -name '*.html' -print0)
-          if [ "${#arquivos[@]}" -eq 0 ]; then
-            echo "Nenhum arquivo HTML encontrado para validar."
-          else
-            npx --yes htmlhint "${arquivos[@]}"
+          if [ ! -s styles.css ]; then
+            echo "Erro: styles.css ausente ou vazio."
+            exit 1
           fi
 
-  validar-css:
+  build:
+    name: Build
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Baixar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Verificar arquivos CSS
-        shell: bash
+      - name: Preparar arquivos do site
         run: |
-          mapfile -d '' arquivos < <(find . -type d \( -name .git -o -name node_modules -o -name dist \) -prune -o -type f -name '*.css' -print0)
-          if [ "${#arquivos[@]}" -eq 0 ]; then
-            echo "Nenhum arquivo CSS encontrado para verificar."
-          else
-            for arquivo in "${arquivos[@]}"; do
-              if [ ! -s "$arquivo" ]; then
-                echo "Erro: arquivo CSS vazio: $arquivo"
-                exit 1
-              fi
-              echo "Arquivo CSS nao vazio: $arquivo"
-            done
-          fi
+          mkdir -p dist
+          cp index.html styles.css dist/
 
-  preparar-entrega:
-    needs: [validar-html, validar-css]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Criar pasta dist
-        run: mkdir -p dist
+      - name: Fazer upload do artefato
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages
+          path: dist/
