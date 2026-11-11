@@ -51,3 +51,37 @@ jobs:
         with:
           name: github-pages
           path: dist/
+
+  deploy:
+    name: Deploy
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacao.outputs.page_url }}
+    steps:
+      - name: Baixar artefato do Build
+        uses: actions/download-artifact@v8
+        with:
+          name: github-pages
+          path: artefato/
+
+      - name: Conferir arquivos do artefato
+        run: |
+          mkdir -p dist
+          tar -xf artefato/artifact.tar -C dist
+          test -s dist/index.html
+          test -s dist/styles.css
+
+      - name: Publicar artefato no GitHub Pages
+        id: publicacao
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages
